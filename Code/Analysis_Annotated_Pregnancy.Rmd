@@ -1,0 +1,197 @@
+---
+title: "Analysis_Annotated_Pregnancy"
+output: html_document
+date: "2023-05-29"
+---
+## Libraries
+```{r, warning = F, message = F}
+library(tidyverse)
+library(factoextra)
+library(ggfortify)
+library(caret)
+library(readxl)
+library(glmnet)
+library(readxl)
+library(pROC)
+library(ggpubr)
+```
+
+# Custom functions used in this analysis
+```{r}
+customSummary <- function(data, lev = NULL, model = NULL) {
+  # Include twoClassSummary for Sensitivity, Specificity, etc.
+  twoClass <- twoClassSummary(data, lev = lev, model = model)
+  # Compute Kappa and Accuracy
+  cm <- confusionMatrix(data$pred, data$obs)
+  kappa <- cm$overall['Kappa']
+  accuracy <- cm$overall['Accuracy']
+  # Combine results into a list
+  out <- c(twoClass, Kappa = kappa, Accuracy = accuracy)
+  return(out)
+}
+
+stratified_sampling <- function(X, Y, size) {
+  Y <- as.factor(Y)
+  
+  # Calculate the minimum size to ensure each class is represented
+  min_size_per_class <- max(round(size / length(levels(Y))), 1)
+  
+  sampled_indices <- unlist(lapply(levels(Y), function(y_level) {
+    indices <- which(Y == y_level)
+    sample(indices, min_size_per_class, replace = TRUE)
+  }))
+  
+  return(sampled_indices)
+}
+
+```
+
+## Read in and format data 
+```{r}
+load("..\\Data_subsets\\Pregnancy\\df_stat.Rdata")
+dat <- read.csv("..\\Raw_data\\Pregnancy\\Positive_annotated.csv") %>%
+  filter(Ionization.Mode == 'Positive') %>%
+  select(-Ionization.Mode) %>%
+  gather(., key = 'file', value = intensity, 2:ncol(.)) %>%
+  mutate(file = str_remove(.$file, '_C')) %>%
+  mutate(file = str_remove(.$file, '_PRE'))
+
+# Merge to only include samples in screening analysis
+dat_samp <- left_join(df_stat[,1:2], dat) 
+
+# Remove noted outlier from screening 
+outliers <- c('TAM_66')
+dat_samp <- dat_samp [!dat_samp $file %in% outliers,]
+dat_wide <- dat_samp %>%
+  spread(., key = Lipid, value = intensity)
+```
+
+
+# LASSO
+```{r}
+# Define independent and dependent variables
+X <- dat_wide[,(3:ncol(dat_wide))]
+Y <- dat_wide$group
+
+# Set any missing values to minimum detected 
+min_value <- min(dat_wide[,(3:ncol(dat_wide))], na.rm = TRUE)
+
+# Set the seed for reproducibility
+set.seed(12345)
+
+# Split the data into training and testing sets
+train_indices <- createDataPartition(Y, p = 3/4, list = FALSE)
+train <- dat_wide[train_indices, ]
+test <- dat_wide[-train_indices, ]
+train_X <- X[train_indices, ]
+train_Y <- Y[train_indices]
+test_X <- X[-train_indices, ]
+test_Y <- Y[-train_indices]
+
+# Perform bootstrapped lasso for feature selection 
+n_bootstraps <- 1000 # Number of bootstrap samples
+feature_selection_frequency <- matrix(0, ncol = ncol(train_X), nrow = n_bootstraps)
+
+# Initialize an empty list to store selected features from each iteration
+selected_features_list <- vector("list", n_bootstraps)
+
+for(i in 1:n_bootstraps) {
+
+  cat("Bootstrap Iteration:", i, "\n")
+
+  # Stratified sampling for bootstrap
+  bootstrap_indices <- stratified_sampling(train_X, train_Y, size = nrow(train_X))
+  bootstrap_X <- train_X[bootstrap_indices, ]
+  bootstrap_Y <- train_Y[bootstrap_indices]
+  bootstrap_X[is.na(bootstrap_X)] <- min_value
+
+  # Create model
+  cv_model <- cv.glmnet(as.matrix(bootstrap_X), bootstrap_Y, alpha = 1, family = 'binomial', type.measure = 'class')
+  lasso_model <- glmnet(as.matrix(bootstrap_X), bootstrap_Y, alpha = 1, family = 'binomial', lambda = cv_model$lambda.min)
+    
+  # Extract coefficients and record selected features
+  coef_lasso <- coef(lasso_model, s = cv_model$lambda.min)
+  selected_features <- rownames(coef_lasso)[which(coef_lasso != 0)]
+
+  # Update the list with selected features
+  selected_features_list[[i]] <- selected_features
+}
+
+# Aggregate the list into a frequency table
+feature_selection_table <- table(unlist(selected_features_list))
+
+# Convert to dataframe
+feature_selection_df <- data.frame(
+  Feature = names(feature_selection_table),
+  SelectionCount = as.integer(feature_selection_table)
+)
+
+# Select features selected at least x times 
+feature_selection_df <- feature_selection_df %>%
+  filter(SelectionCount > 200 & Feature != '(Intercept)')
+top_features <- feature_selection_df$Feature
+save(top_features, file = "..\\Data_subsets\\Pregnancy\\top_lipids.Rdata")
+write.csv(top_features, file = "..\\Data_subsets\\Pregnancy\\top_lipids.csv")
+ 
+# Prune data set down
+top_train <- train[colnames(train) %in% top_features]
+top_train$Group <- train$group
+top_test <- test[colnames(test) %in% top_features]
+top_test$Group <- test$group
+```
+
+# Modeling
+```{r}
+# Data split
+X <- top_train %>%
+  dplyr::select(-"Group")
+Y <- as.factor(top_train$Group)
+X_test <- top_test %>%
+  dplyr::select(-"Group")
+Y_test <- as.factor(top_test$Group)
+
+# Set up the control with a custom summary function
+ctrl <- trainControl(
+  method = "cv",
+  number = 5,
+  summaryFunction = customSummary,
+  classProbs = TRUE,  # Important for twoClassSummary
+  savePredictions = TRUE
+)
+
+# Train the random forest model using the training data
+rf_model <- train(
+  x = X,
+  y = Y,
+  method = 'svmLinear',  
+  trControl = ctrl,  
+  tuneLength = 5,  
+  metric = "ROC"  # ROC is typically used with twoClassSummary
+)
+
+# View results
+rf_model$finalModel
+print(rf_model)
+
+# Obtain predictions on the testing data
+predictions <- predict(rf_model, X_test)
+
+# Create the confusion matrix
+confusion_matrix <- confusionMatrix(predictions, as.factor(Y_test))
+
+# Print the confusion matrix
+print(confusion_matrix)
+
+# Calculate accuracy from the confusion matrix
+accuracy <- confusion_matrix$overall["Accuracy"]
+
+# Calculate Cohen's Kappa from the confusion matrix
+kappa <- confusion_matrix$overall["Kappa"]
+
+# Calculate Sensitivity (True Positive Rate) from the confusion matrix
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Calculate Specificity (True Negative Rate) from the confusion matrix
+specificity <- confusion_matrix$byClass["Specificity"]
+
+```

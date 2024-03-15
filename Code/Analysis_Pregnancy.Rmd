@@ -1,0 +1,480 @@
+---
+title: "Analysis_Pregnancy"
+output: html_document
+date: "2023-05-29"
+---
+## Libraries
+```{r, warning = F, message = F}
+library(tidyverse)
+library(factoextra)
+library(ggfortify)
+library(caret)
+library(readxl)
+library(glmnet)
+library(readxl)
+library(pROC)
+library(ggpubr)
+```
+
+# Custom functions used in this analysis
+```{r}
+bin_data <- function(temp, bin_width_mz, bin_width_drift) {
+  # Create new bin labels based on column values
+  column_values <- as.numeric(colnames(temp))
+  bin_labels <- paste0(column_values - column_values%%bin_width_mz, "-", column_values - column_values%%bin_width_mz + bin_width_mz)
+  colnames(temp) <- bin_labels
+  
+  # Replace all NAs with zeros
+  temp[is.na(temp)] <- 0
+  
+  # Sum together the columns with the same name
+  temp_col <- as.data.frame(t(rowsum(t(temp), group = colnames(temp), na.rm = TRUE)))
+  
+  # Create consistent bin sizes by summing rows with the same row name
+  row_values <- as.numeric(row.names(temp_col))
+  bin_labels <- paste0(row_values - row_values%%bin_width_drift, "-", row_values - row_values%%bin_width_drift + bin_width_drift)
+  temp_col$rownames <- bin_labels
+  
+  temp_row <- aggregate(. ~ rownames, data = temp_col, FUN = sum)
+  row.names(temp_row) <- temp_row$rownames
+  temp_row <- temp_row[, -1]
+  
+  return(temp_row)
+}
+
+customSummary <- function(data, lev = NULL, model = NULL) {
+  # Include twoClassSummary for Sensitivity, Specificity, etc.
+  twoClass <- twoClassSummary(data, lev = lev, model = model)
+  # Compute Kappa and Accuracy
+  cm <- confusionMatrix(data$pred, data$obs)
+  kappa <- cm$overall['Kappa']
+  accuracy <- cm$overall['Accuracy']
+  # Combine results into a list
+  out <- c(twoClass, Kappa = kappa, Accuracy = accuracy)
+  return(out)
+}
+
+stratified_sampling <- function(X, Y, size) {
+  Y <- as.factor(Y)
+  
+  # Calculate the minimum size to ensure each class is represented
+  min_size_per_class <- max(round(size / length(levels(Y))), 1)
+  
+  sampled_indices <- unlist(lapply(levels(Y), function(y_level) {
+    indices <- which(Y == y_level)
+    sample(indices, min_size_per_class, replace = TRUE)
+  }))
+  
+  return(sampled_indices)
+}
+
+```
+
+
+## Read in and format data
+```{r}
+file_list <- list.files("..\\Raw_data\\Pregnancy\\Positive", pattern = "\\.csv$", full.names = TRUE)
+meta <- read_table("..\\Raw_data\\Pregnancy\\Sample_Metadata.txt") %>% as.data.frame()
+meta_samp <- read_excel("..\\Raw_data\\Pregnancy\\Metadata.xlsx", sheet = 1)[,(1:8)]
+colnames(meta)[1] <- 'file'
+colnames(meta_samp)[2] <- 'file'
+
+# Read in all data and format
+dat_list <- list()
+for(i in 1:length(file_list)){
+
+  # Read in file and remove irrelevant info
+  temp <- read.csv(file_list[i], header= T, sep=",")
+  temp <- temp[-c(1:3,5),-2]
+
+  # Move drift to be rownames and masses to colnames
+  row.names(temp) <- temp[, 1]
+  temp <- temp[,-1]
+  colnames(temp) <- temp[1,]
+  temp <- temp[-1,]
+  temp <- temp[as.numeric(row.names(temp)) > 13,] # filter drift times
+  temp <- temp[,as.numeric(colnames(temp)) < 1200] # filter m/zs
+  temp <- temp[,as.numeric(colnames(temp)) > 200]
+
+
+  # Bin data
+  temp_row <- bin_data(temp, bin_width_mz = 2, bin_width_drift = 0.5)
+
+  # Append to list
+  dat_list[[i]] <- temp_row
+  name <- basename(file_list[i])
+  name_new <- sub("^TAM_IMS_Pos_0*(\\d+)_.*\\.csv$", "TAM_\\1", name)
+  names(dat_list)[i] <- name_new
+}
+save(dat_list, file = "..\\Data_subsets\\Pregnancy\\dat_list.Rdata")
+
+# load("G:\\My Drive\\IMS_screening\\Data_subsets\\Pregnancy\\dat_list_pos.Rdata")
+# Format
+dat_list_new <- list()
+for (i in 1:length(dat_list)) {
+  temp <- dat_list[[i]] %>%
+    as.data.frame() %>%
+    rownames_to_column(., 'Drift') %>%
+    gather(., key = 'mz', value = intensity, 2:ncol(.)) %>%
+    mutate(Coord = paste0("(",mz, ",", Drift, ")")) %>% # Create unique identifier
+    mutate(intensity = log2(ifelse(intensity <= 0, 1, intensity))) %>% # Normalize
+    select(-c('Drift', 'mz'))
+  # Add column for file name
+  temp$file <- names(dat_list)[i]
+  
+  # Convert to wide
+  temp <- temp %>% 
+    spread(., key = Coord, value = intensity)
+  
+  # Append to new list
+  dat_list_new[[i]] <- temp
+  names(dat_list_new)[i] <- names(dat_list)[i]
+}
+save(dat_list_new, file = "..\\Data_subsets\\Pregnancy\\dat_list_new_pos.Rdata")
+
+
+# Combine dfs and convert to wide
+df <- bind_rows(dat_list_new)
+
+# Combine with meta data
+df_all <- merge(meta_samp, df, by = 'file')
+save(df_all, file = "..\\Data_subsets\\Pregnancy\\df_all_pos.Rdata")
+```
+
+## Apply abundance filter
+```{r}
+load("G:\\My Drive\\IMS_screening\\Data_subsets\\Pregnancy\\df_all_pos.Rdata")
+colnames(df_all)[3] <- 'age'
+colnames(df_all)[2] <- 'group'
+
+# Filter to 2 conditions
+df_all<- df_all %>%
+  filter(group %in% c('Control', 'PRE'))
+
+# Define the range of columns for which you want to calculate summaries
+start_column <- 9
+end_column <- ncol(df_all)
+
+# # Calculate summary statistics for each column
+summary_results <- sapply(df_all[, start_column:end_column], function(col) {
+  result <- c(
+    Min = min(col, na.rm = TRUE),
+    Max = max(col, na.rm = TRUE),
+    Median = median(col, na.rm = TRUE),
+    Mean = mean(col, na.rm = TRUE),
+    SD = sd(col, na.rm = TRUE)
+  )
+  names(result) <- c("Min", "Max", "Median", "Mean", "SD")
+  return(result)
+})
+
+# Create a dataframe from the summary results
+summary_df <- as.data.frame(summary_results) %>%
+  t(.) %>%
+  as.data.frame()
+summary(summary_df$Median)
+summary(summary_df$Mean)
+
+# Define cut off
+quant <- quantile(summary_df$Median, 0.75)
+
+# Subset
+summary_feat <- summary_df %>%
+  filter(Median >= quant)
+feats <- rownames(summary_feat)
+df_feat <- df_all[, colnames(df_all) %in% feats]
+df_stat <- cbind(df_all[,1:8], df_feat)
+
+# Save
+save(df_stat, file = "..\\Data_subsets\\Pregnancy\\df_stat.Rdata")
+
+```
+
+
+## Assess normality and look for outliers
+```{r}
+load("..\\Data_subsets\\Pregnancy\\df_stat.Rdata")
+
+# Convert to long
+df_long <- df_stat %>%
+  gather(key = 'coord', value = 'intensity', -(1:8))
+p <- ggplot(df_long, aes(x = intensity)) + 
+  geom_density(size = 1.5) +
+  theme_classic() +
+  theme(axis.line = element_line(size = 1.5))  # Adjust the size for thickness
+p
+
+# Calculate the 75th quantile of the intensity data
+quantile_75 <- quantile(df_long$intensity, 0.75)
+
+# Add a vertical line at the 75th quantile
+p <- p + geom_vline(xintercept = quantile_75, linetype="dashed", color="red", size=1)
+
+# PCA
+res.pca <- prcomp(df_stat[, -c(1:2, 4:8)])
+scree_plot<-fviz_eig(res.pca) #scree plot 
+
+# Plot
+pca <- autoplot(res.pca, data = df_stat, colour = 'group') + 
+  theme_classic() #+
+  #geom_text(label = df_stat$file)
+pca
+
+# # Hierarchical clustering
+dist <- dist(df_stat[,9:ncol(df_stat)], method = 'euclidean')
+hc1 <- hclust(dist, method = 'average')
+plot(hc1, cex = 0.6, hang = -1)
+
+# Remove outliers
+pca_results <- cbind(pca[["data"]][["PC1"]], pca[["data"]][["PC2"]], pca[["data"]][["file"]])
+outliers <- c('TAM_66')
+df_stat <- df_stat[!df_stat$file %in% outliers,]
+```
+
+
+# LASSO
+```{r}
+# Define independent and dependent variables
+X <- df_stat[,c(3, 9:ncol(df_stat))]
+Y <- df_stat$group
+
+# Set the seed for reproducibility
+set.seed(12345)
+
+# Split the data into training and testing sets
+train_indices <- createDataPartition(Y, p = 3/4, list = FALSE)
+train <- df_stat[train_indices, ]
+test <- df_stat[-train_indices, ]
+train_X <- X[train_indices, ]
+train_Y <- Y[train_indices]
+test_X <- X[-train_indices, ]
+test_Y <- Y[-train_indices]
+
+# Perform bootstrapped lasso for feature selection 
+n_bootstraps <- 1000 # Number of bootstrap samples
+feature_selection_frequency <- matrix(0, ncol = ncol(train_X), nrow = n_bootstraps)
+
+# Initialize an empty list to store selected features from each iteration
+selected_features_list <- vector("list", n_bootstraps)
+
+for(i in 1:n_bootstraps) {
+
+  cat("Bootstrap Iteration:", i, "\n")
+
+  # Stratified sampling for bootstrap
+  bootstrap_indices <- stratified_sampling(train_X, train_Y, size = nrow(train_X))
+  bootstrap_X <- train_X[bootstrap_indices, ]
+  bootstrap_Y <- train_Y[bootstrap_indices]
+
+  # Create model
+  cv_model <- cv.glmnet(as.matrix(bootstrap_X), bootstrap_Y, alpha = 1, family = 'binomial', type.measure = 'class')
+  lasso_model <- glmnet(as.matrix(bootstrap_X), bootstrap_Y, alpha = 1, family = 'binomial', lambda = cv_model$lambda.min)
+    
+  # Extract coefficients and record selected features
+  coef_lasso <- coef(lasso_model, s = cv_model$lambda.min)
+  selected_features <- rownames(coef_lasso)[which(coef_lasso != 0)]
+
+  # Update the list with selected features
+  selected_features_list[[i]] <- selected_features
+}
+
+# Aggregate the list into a frequency table
+feature_selection_table <- table(unlist(selected_features_list))
+
+# Convert to dataframe
+feature_selection_df <- data.frame(
+  Feature = names(feature_selection_table),
+  SelectionCount = as.integer(feature_selection_table)
+)
+
+# Select features selected at least x times 
+feature_selection_df <- feature_selection_df %>%
+  filter(SelectionCount > 200 & Feature != '(Intercept)')
+top_features <- feature_selection_df$Feature
+save(top_features, file = "..\\Data_subsets\\Pregnancy\\top_features.Rdata")
+write.csv(top_features, file = "..\\Data_subsets\\Pregnancy\\top_features.csv")
+ 
+# Prune data set down
+load("..\\Data_subsets\\Pregnancy\\top_features.Rdata")
+top_train <- train[colnames(train) %in% top_features]
+top_train$Group <- train$group
+top_test <- test[colnames(test) %in% top_features]
+top_test$Group <- test$group
+```
+
+# Modeling
+```{r}
+# Data split
+X <- top_train %>%
+  dplyr::select(-"Group")
+Y <- as.factor(top_train$Group)
+X_test <- top_test %>%
+  dplyr::select(-"Group")
+Y_test <- as.factor(top_test$Group)
+
+# Set up the control with a custom summary function
+ctrl <- trainControl(
+  method = "cv",
+  number = 5,
+  summaryFunction = customSummary,
+  classProbs = TRUE,  # Important for twoClassSummary
+  savePredictions = TRUE
+)
+
+# Train the random forest model using the training data
+rf_model <- train(
+  x = X,
+  y = Y,
+  method = 'svmLinear',  
+  trControl = ctrl,  
+  tuneLength = 5,  
+  metric = "ROC"  # ROC is typically used with twoClassSummary
+)
+
+# View results
+rf_model$finalModel
+print(rf_model)
+
+# Extract feature importance
+feature_importance <- varImp(rf_model) %>%
+  .[[1]] %>%
+  arrange(desc(Preeclampsia)) 
+
+# Obtain predictions on the testing data
+predictions <- predict(rf_model, X_test)
+
+# Create the confusion matrix
+confusion_matrix <- confusionMatrix(predictions, as.factor(Y_test))
+
+# Print the confusion matrix
+print(confusion_matrix)
+
+# Calculate accuracy from the confusion matrix
+accuracy <- confusion_matrix$overall["Accuracy"]
+
+# Calculate Cohen's Kappa from the confusion matrix
+kappa <- confusion_matrix$overall["Kappa"]
+
+# Calculate Sensitivity (True Positive Rate) from the confusion matrix
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Calculate Specificity (True Negative Rate) from the confusion matrix
+specificity <- confusion_matrix$byClass["Specificity"]
+
+```
+
+# Make boxplots of top features
+```{r}
+top_df <- top_train %>%
+  gather(key = 'coord', value = 'intensity', -ncol(top_train)) %>%
+  .[.$coord %in% rownames(feature_importance),]
+
+# Plot 
+p <- ggplot(data = top_df, aes(x = coord , y = intensity, fill = Group)) +
+  geom_boxplot(outlier.shape = NA, show.legend = T) +
+  theme_classic() +
+  scale_fill_manual(values = c('grey', 'darkred')) +
+  theme(axis.text = element_text(size = 8),
+        axis.title = element_text(size = 8, face = 'bold'),
+        axis.text.x = element_text(size = 7, angle = 45, hjust = 1),
+        legend.text = element_text(size = 7),  # Adjust the legend text size (smaller)
+        legend.key.size = unit(0.5, "cm"),
+        legend.title = element_text(size = 8)) +  # Adjust the legend title size
+  theme(plot.title = element_text(hjust = 0.5)) +# Center title
+  xlab('Coordinate (m/z, drift time)') +
+  ylab('Abundance')
+ggsave('..//Analysis//Pregnancy//Boxplots.png', plot = p, width = 3.25, height = 2.75)
+
+# For slides 
+p <- ggplot(data = top_df, aes(x = coord , y = intensity, fill = Group)) +
+  geom_boxplot(outlier.shape = NA, show.legend = T) +
+  theme_classic() +
+  scale_fill_manual(values = c('grey', 'darkred')) +
+  theme(axis.text = element_text(size = 16),
+        axis.title = element_text(size = 16, face = 'bold'),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+        legend.text = element_text(size = 12),  # Adjust the legend text size (smaller)
+        legend.key.size = unit(0.5, "cm"),
+        legend.title = element_text(size = 16)) +  # Adjust the legend title size
+  theme(plot.title = element_text(hjust = 0.5)) +# Center title
+  xlab('Coordinate (m/z, drift time)') +
+  ylab('Abundance') 
+ggsave('..//Analysis//Pregnancy//Boxplots_slides.png', plot = p, width = 10, height = 5)
+
+```
+
+# Plot heatmaps
+```{r}
+# Find best sample examples
+top_df <- df_stat[, c('file', 'group', '(848-850,36.5-37)')]
+
+# Convert to long
+df_long <- df_all %>%
+  gather(key = 'coord', value = 'intensity', -(1:8))
+
+# Split coordinates
+df_long <- df_long %>%
+  mutate(coord_temp = gsub("\\(|\\)", "", coord)) %>%
+  mutate(x_range = sub(",(.*)", "", coord_temp),
+         y_range = sub(".*,", "", coord_temp),
+         x_start = as.numeric(sub("-.*", "", x_range)),
+         x_end = as.numeric(sub(".*-", "", x_range)),
+         y_start = as.numeric(sub("-.*", "", y_range)),
+         y_end = as.numeric(sub(".*-", "", y_range)))
+
+# Identify important coordinates for circling
+sig_coord <- df_long %>%
+  filter(coord %in% top_features) %>%
+  .[,11:ncol(df_long)] %>%
+  unique()
+
+# Condition for highlighting
+highlight_x <- sig_coord$x_start + 1  # 1 is half of the width of the tile 
+highlight_y <- sig_coord$y_start + 0.25  # 0.25 is half of the height of the tile 
+highlight_data <- data.frame(x = highlight_x, y = highlight_y)
+
+
+# Iterate through files and plot
+files <- unique(df_long$file)
+plot_list <- list()
+for(i in 1:length(files)){
+  temp <- df_long %>%
+    filter(file == files[i]) #%>%
+
+  # Plot
+  title <- paste0(unique(temp$file), ': ', unique(temp$group))
+
+  p <- ggplot(temp) +
+    geom_tile(aes(x = x_start + 1, y = y_start -0.25, fill = intensity)) +
+    # geom_point(data = highlight_data, aes(x = x, y = y), shape = 1, color = "white", size = 1.5, stroke = 1) +
+    scale_fill_gradientn(
+      colors = c("black", "black", "black", "darkblue", "blue", "green", "yellow", "red"),
+      limits = c(min(temp$intensity), max(temp$intensity))  # Set the color scale limits
+    ) +
+    labs(x = "m/z", y = "Drift time (ms)", fill = "Abundance") +
+    theme_classic() +
+    scale_x_continuous(expand = c(0, 0)) + 
+    scale_y_continuous(expand = c(0, 0)) +  
+    theme(
+      axis.title.x = element_text(face = "bold.italic"),  # Make x-axis title bold and italicized
+      axis.title.y = element_text(face = "bold"),  # Make y-axis title bold
+      plot.title = element_text(hjust = 0.5)
+    ) +
+    ggtitle(`title`) 
+
+
+  # Append to list 
+  plot_list[[i]] <- p
+  names(plot_list)[i] <- files[i]
+}
+save(plot_list, file = "..//Data_subsets//Pregnancy//Plot_list.Rdata")
+# 
+# 
+# # Print plots to pdf
+file <- paste0('..\\Analysis\\Pregnancy\\heatmaps.pdf')
+pdf(file = file, width = 11, height = 6)
+  plots<-ggarrange(plotlist = plot_list, ncol=2, nrow=2)
+  print(plots)
+dev.off()
+```
+

@@ -1,0 +1,188 @@
+Sample_ID	Dataset_Name	Sample_Type
+TAM_10	TAM_10_C	Control
+TAM_106	TAM_106_C	Control
+TAM_109	TAM_109_C	Control
+TAM_111	TAM_111_C	Control
+TAM_116	TAM_116_C	Control
+TAM_120	TAM_120_C	Control
+TAM_123	TAM_123_C	Control
+TAM_124	TAM_124_C	Control
+TAM_125	TAM_125_C	Control
+TAM_127	TAM_127_C	Control
+TAM_129	TAM_129_C	Control
+TAM_13	TAM_13_C	Control
+TAM_139	TAM_139_C	Control
+TAM_15	TAM_15_C	Control
+TAM_150	TAM_150_C	Control
+TAM_158	TAM_158_C	Control
+TAM_172	TAM_172_C	Control
+TAM_173	TAM_173_C	Control
+TAM_18	TAM_18_C	Control
+TAM_187	TAM_187_C	Control
+TAM_188	TAM_188_C	Control
+TAM_2	TAM_2_C	Control
+TAM_202	TAM_202_C	Control
+TAM_203	TAM_203_C	Control
+TAM_21	TAM_21_C	Control
+TAM_216	TAM_216_C	Control
+TAM_223	TAM_223_C	Control
+TAM_224	TAM_224_C	Control
+TAM_228	TAM_228_C	Control
+TAM_233	TAM_233_C	Control
+TAM_243	TAM_243_C	Control
+TAM_244	TAM_244_C	Control
+TAM_263	TAM_263_C	Control
+TAM_265	TAM_265_C	Control
+TAM_28	TAM_28_C	Control
+TAM_307	TAM_307_C	Control
+TAM_318	TAM_318_C	Control
+TAM_332	TAM_332_C	Control
+TAM_340	TAM_340_C	Control
+TAM_36	TAM_36_C	Control
+TAM_37	TAM_37_C	Control
+TAM_38	TAM_38_C	Control
+TAM_41	TAM_41_C	Control
+TAM_416	TAM_416_C	Control
+TAM_418	TAM_418_C	Control
+TAM_434	TAM_434_C	Control
+TAM_436	TAM_436_C	Control
+TAM_45	TAM_45_C	Control
+TAM_46	TAM_46_C	Control
+TAM_469	TAM_469_C	Control
+TAM_486	TAM_486_C	Control
+TAM_513	TAM_513_C	Control
+TAM_52	TAM_52_C	Control
+TAM_56	TAM_56_C	Control
+TAM_57	TAM_57_C	Control
+TAM_577	TAM_577_C	Control
+TAM_59	TAM_59_C	Control
+TAM_60	TAM_60_C	Control
+TAM_61	TAM_61_C	Control
+TAM_610	TAM_610_C	Control
+TAM_62	TAM_62_C	Control
+TAM_64	TAM_64_C	Control
+TAM_640	TAM_640_C	Control
+TAM_648	TAM_648_C	Control
+TAM_653	TAM_653_C	Control
+TAM_66	TAM_66_C	Control
+TAM_671	TAM_671_C	Control
+TAM_675	TAM_675_C	Control
+TAM_684	TAM_684_C	Control
+TAM_69	TAM_69_C	Control
+TAM_697	TAM_697_C	Control
+TAM_708	TAM_708_C	Control
+TAM_714	TAM_714_C	Control
+TAM_719	TAM_719_C	Control
+TAM_73	TAM_73_C	Control
+TAM_736	TAM_736_C	Control
+TAM_75	TAM_75_C	Control
+TAM_759	TAM_759_C	Control
+TAM_76	TAM_76_C	Control
+TAM_767	TAM_767_C	Control
+TAM_787	TAM_787_C	Control
+TAM_80	TAM_80_C	Control
+TAM_81	TAM_81_C	Control
+TAM_82	TAM_82_C	Control
+TAM_85	TAM_85_C	Control
+TAM_86	TAM_86_C	Control
+TAM_89	TAM_89_C	Control
+TAM_9	TAM_9_C	Control
+TAM_90	TAM_90_C	Control
+TAM_95	TAM_95_C	Control
+TAM_96	TAM_96_C	Control
+TAM_97	TAM_97_C	Control
+TAM_98	TAM_98_C	Control
+TAM_102	TAM_102_GDM	Gestational diabetes mellitus (GDM)
+TAM_1030	TAM_1030_GDM	Gestational diabetes mellitus (GDM)
+TAM_1040	TAM_1040_GDM	Gestational diabetes mellitus (GDM)
+TAM_105	TAM_105_GDM	Gestational diabetes mellitus (GDM)
+TAM_1107	TAM_1107_GDM	Gestational diabetes mellitus (GDM)
+TAM_1278	TAM_1278_GDM	Gestational diabetes mellitus (GDM)
+TAM_1297	TAM_1297_GDM	Gestational diabetes mellitus (GDM)
+TAM_1303	TAM_1303_GDM	Gestational diabetes mellitus (GDM)
+TAM_134	TAM_134_GDM	Gestational diabetes mellitus (GDM)
+TAM_1385	TAM_1385_GDM	Gestational diabetes mellitus (GDM)
+TAM_141	TAM_141_GDM	Gestational diabetes mellitus (GDM)
+TAM_1466	TAM_1466_GDM	Gestational diabetes mellitus (GDM)
+TAM_156	TAM_156_GDM	Gestational diabetes mellitus (GDM)
+TAM_1597	TAM_1597_GDM	Gestational diabetes mellitus (GDM)
+TAM_160	TAM_160_GDM	Gestational diabetes mellitus (GDM)
+TAM_163	TAM_163_GDM	Gestational diabetes mellitus (GDM)
+TAM_1657	TAM_1657_GDM	Gestational diabetes mellitus (GDM)
+TAM_168	TAM_168_GDM	Gestational diabetes mellitus (GDM)
+TAM_171	TAM_171_GDM	Gestational diabetes mellitus (GDM)
+TAM_185	TAM_185_GDM	Gestational diabetes mellitus (GDM)
+TAM_205	TAM_205_GDM	Gestational diabetes mellitus (GDM)
+TAM_209	TAM_209_GDM	Gestational diabetes mellitus (GDM)
+TAM_218	TAM_218_GDM	Gestational diabetes mellitus (GDM)
+TAM_23	TAM_23_GDM	Gestational diabetes mellitus (GDM)
+TAM_236	TAM_236_GDM	Gestational diabetes mellitus (GDM)
+TAM_250	TAM_250_GDM	Gestational diabetes mellitus (GDM)
+TAM_32	TAM_32_GDM	Gestational diabetes mellitus (GDM)
+TAM_4287	TAM_4287_GDM	Gestational diabetes mellitus (GDM)
+TAM_476	TAM_476_GDM	Gestational diabetes mellitus (GDM)
+TAM_53	TAM_53_GDM	Gestational diabetes mellitus (GDM)
+TAM_587	TAM_587_GDM	Gestational diabetes mellitus (GDM)
+TAM_641	TAM_641_GDM	Gestational diabetes mellitus (GDM)
+TAM_647	TAM_647_GDM	Gestational diabetes mellitus (GDM)
+TAM_657	TAM_657_GDM	Gestational diabetes mellitus (GDM)
+TAM_68	TAM_68_GDM	Gestational diabetes mellitus (GDM)
+TAM_725	TAM_725_GDM	Gestational diabetes mellitus (GDM)
+TAM_74	TAM_74_GDM	Gestational diabetes mellitus (GDM)
+TAM_79	TAM_79_GDM	Gestational diabetes mellitus (GDM)
+TAM_803	TAM_803_GDM	Gestational diabetes mellitus (GDM)
+TAM_816	TAM_816_GDM	Gestational diabetes mellitus (GDM)
+TAM_817	TAM_817_GDM	Gestational diabetes mellitus (GDM)
+TAM_886	TAM_886_GDM	Gestational diabetes mellitus (GDM)
+TAM_900	TAM_900_GDM	Gestational diabetes mellitus (GDM)
+TAM_930	TAM_930_GDM	Gestational diabetes mellitus (GDM)
+TAM_963	TAM_963_GDM	Gestational diabetes mellitus (GDM)
+TAM_1155	TAM_1155_PE	Preeclampsia (PE)
+TAM_1175	TAM_1175_PE	Preeclampsia (PE)
+TAM_1196	TAM_1196_PE	Preeclampsia (PE)
+TAM_121	TAM_121_PE	Preeclampsia (PE)
+TAM_138	TAM_138_PE	Preeclampsia (PE)
+TAM_1446	TAM_1446_PE	Preeclampsia (PE)
+TAM_1487	TAM_1487_PE	Preeclampsia (PE)
+TAM_1595	TAM_1595_PE	Preeclampsia (PE)
+TAM_1634	TAM_1634_PE	Preeclampsia (PE)
+TAM_17186	TAM_17186_PE	Preeclampsia (PE)
+TAM_1763	TAM_1763_PE	Preeclampsia (PE)
+TAM_2379	TAM_2379_PE	Preeclampsia (PE)
+TAM_245	TAM_245_PE	Preeclampsia (PE)
+TAM_2470	TAM_2470_PE	Preeclampsia (PE)
+TAM_2637	TAM_2637_PE	Preeclampsia (PE)
+TAM_2750	TAM_2750_PE	Preeclampsia (PE)
+TAM_2846	TAM_2846_PE	Preeclampsia (PE)
+TAM_2892	TAM_2892_PE	Preeclampsia (PE)
+TAM_3232	TAM_3232_PE	Preeclampsia (PE)
+TAM_3347	TAM_3347_PE	Preeclampsia (PE)
+TAM_3997	TAM_3997_PE	Preeclampsia (PE)
+TAM_4096	TAM_4096_PE	Preeclampsia (PE)
+TAM_4125	TAM_4125_PE	Preeclampsia (PE)
+TAM_4276	TAM_4276_PE	Preeclampsia (PE)
+TAM_4337	TAM_4337_PE	Preeclampsia (PE)
+TAM_4622	TAM_4622_PE	Preeclampsia (PE)
+TAM_5039	TAM_5039_PE	Preeclampsia (PE)
+TAM_5155	TAM_5155_PE	Preeclampsia (PE)
+TAM_5239	TAM_5239_PE	Preeclampsia (PE)
+TAM_5314	TAM_5314_PE	Preeclampsia (PE)
+TAM_5661	TAM_5661_PE	Preeclampsia (PE)
+TAM_5735	TAM_5735_PE	Preeclampsia (PE)
+TAM_6009	TAM_6009_PE	Preeclampsia (PE)
+TAM_606	TAM_606_PE	Preeclampsia (PE)
+TAM_6109	TAM_6109_PE	Preeclampsia (PE)
+TAM_6171	TAM_6171_PE	Preeclampsia (PE)
+TAM_622	TAM_622_PE	Preeclampsia (PE)
+TAM_6284	TAM_6284_PE	Preeclampsia (PE)
+TAM_6342	TAM_6342_PE	Preeclampsia (PE)
+TAM_687	TAM_687_PE	Preeclampsia (PE)
+TAM_7064	TAM_7064_PE	Preeclampsia (PE)
+TAM_7124	TAM_7124_PE	Preeclampsia (PE)
+TAM_7194	TAM_7194_PE	Preeclampsia (PE)
+TAM_721	TAM_721_PE	Preeclampsia (PE)
+TAM_7263	TAM_7263_PE	Preeclampsia (PE)
+TAM_7486	TAM_7486_PE	Preeclampsia (PE)
+TAM_7635	TAM_7635_PE	Preeclampsia (PE)
+TAM_7924	TAM_7924_PE	Preeclampsia (PE)
+TAM_7931	TAM_7931_PE	Preeclampsia (PE)
