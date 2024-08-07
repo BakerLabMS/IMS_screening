@@ -195,45 +195,6 @@ save(df_stat, file = "..\\Data_subsets\\Pregnancy\\df_stat.Rdata")
 ```{r}
 load("..\\Data_subsets\\Pregnancy\\df_stat.Rdata")
 
-# Convert to long
-df_long <- df_stat %>%
-  gather(key = 'coord', value = 'intensity', -(1:8))
-p <- ggplot(df_long, aes(x = intensity)) + 
-  geom_density(size = 1.5) +
-  theme_classic() +
-  theme(axis.line = element_line(size = 1.5))  # Adjust the size for thickness
-p
-
-# Calculate the 75th quantile of the intensity data
-quantile_75 <- quantile(df_long$intensity, 0.75)
-
-# Add a vertical line at the 75th quantile
-p <- p + geom_vline(xintercept = quantile_75, linetype="dashed", color="red", size=1)
-
-# PCA
-res.pca <- prcomp(df_stat[, -c(1:2, 4:8)])
-scree_plot<-fviz_eig(res.pca) #scree plot 
-
-# Plot
-pca <- autoplot(res.pca, data = df_stat, colour = 'group') + 
-  theme_classic() #+
-  #geom_text(label = df_stat$file)
-pca
-
-# # Hierarchical clustering
-dist <- dist(df_stat[,9:ncol(df_stat)], method = 'euclidean')
-hc1 <- hclust(dist, method = 'average')
-plot(hc1, cex = 0.6, hang = -1)
-
-# Remove outliers
-pca_results <- cbind(pca[["data"]][["PC1"]], pca[["data"]][["PC2"]], pca[["data"]][["file"]])
-outliers <- c('TAM_66')
-df_stat <- df_stat[!df_stat$file %in% outliers,]
-```
-
-
-# LASSO
-```{r}
 # Define independent and dependent variables
 X <- df_stat[,c(3, 9:ncol(df_stat))]
 Y <- df_stat$group
@@ -250,6 +211,61 @@ train_Y <- Y[train_indices]
 test_X <- X[-train_indices, ]
 test_Y <- Y[-train_indices]
 
+
+# Convert to long
+df_long <- df_stat %>%
+  gather(key = 'coord', value = 'intensity', -(1:8))
+p <- ggplot(df_long, aes(x = intensity)) + 
+  geom_density(size = 1.5) +
+  theme_classic() +
+  theme(axis.line = element_line(size = 1.5))  # Adjust the size for thickness
+p
+
+# Calculate the 75th quantile of the intensity data
+quantile_75 <- quantile(df_long$intensity, 0.75)
+
+# Add a vertical line at the 75th quantile
+p <- p + geom_vline(xintercept = quantile_75, linetype="dashed", color="red", size=1)
+
+res.pca <- prcomp(train_X, scale. = TRUE)
+scree_plot <- fviz_eig(res.pca) # Scree plot
+print(scree_plot)
+
+# Apply PCA to testing data
+test_pca <- predict(res.pca, newdata = test_X)
+
+# Plot PCA results for training data
+pca <- autoplot(res.pca, data = train, colour = 'group') + 
+  theme_classic()
+print(pca)
+
+# Hierarchical clustering on training data
+dist_train <- dist(train_X, method = 'euclidean')
+hc1 <- hclust(dist_train, method = 'average')
+plot(hc1, cex = 0.6, hang = -1)
+
+# Apply the same clustering to the testing data
+test_dist <- dist(test_X, method = 'euclidean')
+test_hc <- cutree(hc1, k = length(unique(train_Y)))
+
+# Plot dendrogram for test data
+plot(hclust(test_dist, method = 'average'), cex = 0.6, hang = -1)
+
+# Remove outliers
+pca_results <- cbind(pca[["data"]][["PC1"]], pca[["data"]][["PC2"]], pca[["data"]][["file"]])
+outliers <- c('TAM_66')
+df_stat <- df_stat[!df_stat$file %in% outliers, ]
+
+# Print test PCA and clustering results
+test_pca_results <- data.frame(test_pca)
+test_cluster_results <- data.frame(Cluster = test_hc)
+print(test_pca_results)
+print(test_cluster_results)
+```
+
+
+# LASSO
+```{r}
 # Perform bootstrapped lasso for feature selection 
 n_bootstraps <- 1000 # Number of bootstrap samples
 feature_selection_frequency <- matrix(0, ncol = ncol(train_X), nrow = n_bootstraps)
@@ -322,7 +338,7 @@ ctrl <- trainControl(
 )
 
 # Train the random forest model using the training data
-rf_model <- train(
+svmmodel <- train(
   x = X,
   y = Y,
   method = 'svmLinear',  
@@ -332,16 +348,16 @@ rf_model <- train(
 )
 
 # View results
-rf_model$finalModel
-print(rf_model)
+svmmodel$finalModel
+print(svmmodel)
 
 # Extract feature importance
-feature_importance <- varImp(rf_model) %>%
+feature_importance <- varImp(svmmodel) %>%
   .[[1]] %>%
   arrange(desc(PRE)) 
 
 # Obtain predictions on the testing data
-predictions <- predict(rf_model, X_test)
+predictions <- predict(svmmodel, X_test)
 
 # Create the confusion matrix
 confusion_matrix <- confusionMatrix(predictions, as.factor(Y_test))
